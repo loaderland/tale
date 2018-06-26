@@ -1,21 +1,18 @@
 package com.tale.service;
 
+import com.blade.exception.ValidatorException;
 import com.blade.ioc.annotation.Bean;
 import com.blade.ioc.annotation.Inject;
 import com.blade.kit.BladeKit;
 import com.blade.kit.DateKit;
 import com.blade.kit.EncryptKit;
 import com.blade.kit.StringKit;
-import com.tale.controller.admin.AttachController;
-import com.tale.exception.TipException;
-import com.tale.init.SqliteJdbc;
-import com.tale.init.TaleConst;
+import com.tale.bootstrap.SqliteJdbc;
+import com.tale.bootstrap.TaleConst;
 import com.tale.model.dto.*;
 import com.tale.model.entity.*;
 import com.tale.utils.MapCache;
 import com.tale.utils.TaleUtils;
-import com.tale.utils.ZipUtils;
-
 import io.github.biezhi.anima.enums.OrderBy;
 import io.github.biezhi.anima.page.Page;
 
@@ -25,6 +22,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.tale.bootstrap.TaleConst.CLASSPATH;
 import static io.github.biezhi.anima.Anima.select;
 
 /**
@@ -58,9 +56,9 @@ public class SiteService {
             File   lock = new File(cp + "install.lock");
             lock.createNewFile();
             TaleConst.INSTALLED = Boolean.TRUE;
-            new Logs(LogActions.INIT_SITE, null, "", uid.intValue()).save();
+            new Logs("初始化站点", null, "", uid).save();
         } catch (Exception e) {
-            throw new TipException("初始化站点失败");
+            throw new ValidatorException("初始化站点失败");
         }
     }
 
@@ -92,7 +90,7 @@ public class SiteService {
         // 最新文章
         if (Types.RECENT_ARTICLE.equals(type)) {
             Page<Contents> contentsPage = select().from(Contents.class).where(Contents::getStatus, Types.PUBLISH)
-                    .and(Contents::getStatus, Types.ARTICLE)
+                    .and(Contents::getType, Types.ARTICLE)
                     .order(Contents::getCreated, OrderBy.DESC)
                     .page(1, limit);
 
@@ -201,21 +199,18 @@ public class SiteService {
         BackResponse backResponse = new BackResponse();
         if ("attach".equals(bkType)) {
             if (StringKit.isBlank(bkPath)) {
-                throw new TipException("请输入备份文件存储路径");
+                throw new ValidatorException("请输入备份文件存储路径");
             }
             if (!Files.isDirectory(Paths.get(bkPath))) {
-                throw new TipException("请输入一个存在的目录");
+                throw new ValidatorException("请输入一个存在的目录");
             }
-            String bkAttachDir = AttachController.CLASSPATH + "upload";
-            String bkThemesDir = AttachController.CLASSPATH + "templates/themes";
+            String bkAttachDir = CLASSPATH + "upload";
+            String bkThemesDir = CLASSPATH + "templates/themes";
 
             String fname = DateKit.toString(new Date(), fmt) + "_" + StringKit.rand(5) + ".zip";
 
             String attachPath = bkPath + "/" + "attachs_" + fname;
             String themesPath = bkPath + "/" + "themes_" + fname;
-
-            ZipUtils.zipFolder(bkAttachDir, attachPath);
-            ZipUtils.zipFolder(bkThemesDir, themesPath);
 
             backResponse.setAttach_path(attachPath);
             backResponse.setTheme_path(themesPath);
@@ -223,7 +218,7 @@ public class SiteService {
         // 备份数据库
         if ("db".equals(bkType)) {
             String filePath = "upload/" + DateKit.toString(new Date(), "yyyyMMddHHmmss") + "_" + StringKit.rand(8) + ".db";
-            String cp       = AttachController.CLASSPATH + filePath;
+            String cp       = CLASSPATH + filePath;
             Files.createDirectory(Paths.get(cp));
             Files.copy(Paths.get(SqliteJdbc.DB_PATH), Paths.get(cp));
             backResponse.setSql_path("/" + filePath);
